@@ -11,6 +11,7 @@ Shader "Unlit/Raymarch"
 
         Pass
         {
+            Blend One One
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -20,6 +21,8 @@ Shader "Unlit/Raymarch"
 
 
             sampler2D _MainTex;
+            sampler2D _CameraDepthTexture;
+            sampler2D _GrabTexture;
             float4 _MainTex_ST;
 
             struct appdata
@@ -39,6 +42,7 @@ Shader "Unlit/Raymarch"
             {
                 return length(refrence - centre)-r;
             }
+           
             v2f vert (appdata v)
             {
                 v2f o;
@@ -51,12 +55,16 @@ Shader "Unlit/Raymarch"
 
             float4 frag (v2f i) : SV_Target
             {
-                // sample the texture
-             
-            
-                return -sign(sdfSphere(i.wPos.rgb,float3(0,0,0),3.2));
+               
+               if((sign(sdfSphere(i.vertex.rgb,float3(750,450,500),500)))<0)
+               {
+                    return float4(1,1,1,1);
+               }
+               return float4(0,0,0,0);
             }
             ENDCG
+            
+               
         }
     }
 }
