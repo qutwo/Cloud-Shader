@@ -1,0 +1,137 @@
+
+#pragma kernel CSMain
+
+
+RWTexture2D<float4> Result;
+float2 random(float2 p) 
+{
+    return frac(sin(float2(dot(p, float2(127.1, 311.7)), dot(p, float2(269.5, 183.3)))) * 43758.5453);
+}
+float2 n22(float2 p)
+{
+    float3 a = frac(p.xyx * float3(123.34, 234.34, 345.65));
+    a += dot(a, a + 34.45);
+    return frac(float2(a.x * a.y, a.y * a.z));
+}
+float2 get_gradient(float2 pos)
+{
+    float tau = 6.283185;
+    float angle = n22(pos).x * tau;
+    return float2(cos(angle), sin(angle));
+}
+
+float3 sqaureLerp(float BL, float BR, float TR, float TL, float2 f, float2 fDer)
+{
+    float sLerp = lerp(lerp(BL, BR, f.x), lerp(TL, TR, f.x), f.y);
+    float derLerpx = lerp((BR - BL) * fDer.x, (TR - TL) * fDer.x, f.y);
+    float derLerpy = (lerp(TL, TR, f.x) - lerp(BL, BR, f.x)) * fDer.y;
+    
+    
+    return float3(sLerp, derLerpx, derLerpy);
+
+}
+
+float3 perlin(float freq, float amp,float2 pos)
+{
+    pos *= freq;
+    
+    float2 i = floor(pos);
+    float2 f = frac(pos);
+    
+    float2 BL = i;
+    float2 BR = i + float2(1., 0.);
+    float2 TR = i + float2(1., 1.);
+    float2 TL = i + float2(0., 1.);
+    
+    float BLdot = dot(f - float2(0., 0.), get_gradient(BL));
+    float BRdot = dot(f - float2(1., 0.), get_gradient(BR));
+    float TRdot = dot(f - float2(1., 1.), get_gradient(TR));
+    float TLdot = dot(f - float2(0., 1.), get_gradient(TL));
+    
+    float2 q = f * f * f * (f * (f * 6 - 15) + 10);
+    float2 qDer = 30 * f * f*((f * f) - (2 * f) + 1);
+    
+    return sqaureLerp(BLdot, BRdot, TRdot, TLdot, q,qDer)*amp;
+    
+}
+
+float worley(float2 pos,float freq,float amp)
+{
+    
+    
+    //scales the space
+    pos *= freq;
+
+    //creates cell
+    float2 i = floor(pos);
+    float2 f = frac(pos);
+    
+    float min = 1.;
+
+
+   
+    for (int x = -1; x < 2; x++)
+    {
+        for (int y = -1; y < 2; y++)
+        {
+            float2 neighbour = float2(x, y);
+            
+            //calcualte the random point between 0 and 1
+            float2 p = random(i + neighbour);
+            
+            //calculates the distance by offsetting the random point by neighbour
+            float dist = distance(f, p + neighbour);
+            
+            //finds the minimum distance
+            if (dist < min)
+            {
+                min = dist;
+            }
+            
+            
+            
+
+        }
+    }
+    
+    return (1 - min)*amp;
+
+}
+float2 curl(float2 pos, float freq, float amp)
+{
+    
+    
+    float3 final = perlin(freq, amp, pos);
+    return 0.5 + (0.5 * float4(final.z, -final.y, -1., 1.));
+ 
+
+    
+}
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float2 pos = id.xy / 1024.;
+    float freq = 4.;
+    float amp = 1.;
+    float final = 0.;
+    for (int i = 0; i < 6; i++)
+    {
+        final += perlin(freq, amp, pos).x;
+        freq *= 2.;
+        amp *= 0.5;
+
+    }
+    freq = 12.;
+    amp = 0.5;
+    for (int j = 0; j < 6; j++)
+    {
+        pos += curl(pos, 2., 0.05);
+        final += worley(pos,freq, amp);
+        freq *= 2.;
+        amp *= 0.5;
+
+    }
+    
+    Result[id.xy] = 0.1 + (0.5 * final);
+}
